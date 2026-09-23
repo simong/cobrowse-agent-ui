@@ -12,6 +12,12 @@ import {
   type SessionData,
   SessionRating,
   SmartConnectButton,
+  Table,
+  sortRows,
+  ASCENDING,
+  DESCENDING,
+  type TableSort,
+  type TableSortButtonState,
   UserIcon,
   useRemoteContext,
   i18n
@@ -326,6 +332,90 @@ const EndSessionButton = () => {
     <button type='button' className='end-session-button' onClick={() => ctx?.endSession()}>
       End session
     </button>
+  )
+}
+
+const SortIndicator = ({ isSorted, direction }: TableSortButtonState) => {
+  if (!isSorted) return <span className='sort-indicator'>↕</span>
+
+  return <span className='sort-indicator sort-indicator-active'>{direction === DESCENDING ? '↓' : '↑'}</span>
+}
+
+const TableSection = () => {
+  const [rows, setRows] = useState(deviceSamples)
+  const [sort, setSort] = useState<TableSort>({ key: 'name', direction: ASCENDING })
+
+  // last_active is a timestamp on the sample but is shown as a relative string,
+  // so the column says what it sorts by rather than sorting the rendered text
+  const sortValues = useMemo(() => ({
+    status: (device: SampleDevice) => device.online,
+    last_active: (device: SampleDevice) => device.last_active
+  }), [])
+
+  // the table reports the sort, ordering the rows for it is this component's job
+  const sorted = useMemo(() => sortRows(rows, sort, sortValues), [rows, sort, sortValues])
+
+  return (
+    <Section
+      title='Table'
+      subtitle='Sortable table with no styling passed: the appearance comes from the component, and the caller holds the sort state, ordering the rows with sortRows.'
+    >
+      <div className='panel'>
+        <Table sort={sort} onSortChange={setSort}>
+          <Table.Head>
+            <Table.Row>
+              <Table.HeadCell column='name'>
+                <Table.SortButton>
+                  {(state) => <>Device<SortIndicator {...state} /></>}
+                </Table.SortButton>
+              </Table.HeadCell>
+              <Table.HeadCell column='location'>
+                <Table.SortButton>
+                  {(state) => <>Location<SortIndicator {...state} /></>}
+                </Table.SortButton>
+              </Table.HeadCell>
+              <Table.HeadCell column='status'>
+                <Table.SortButton firstDirection={DESCENDING}>
+                  {(state) => <>Status<SortIndicator {...state} /></>}
+                </Table.SortButton>
+              </Table.HeadCell>
+              {/* a column with no sort button, and so no `column` to name */}
+              <Table.HeadCell>Platform</Table.HeadCell>
+              <Table.HeadCell column='last_active' className='numeric-column'>
+                <Table.SortButton firstDirection={DESCENDING} className='numeric-sort-button'>
+                  {(state) => <>Last active<SortIndicator {...state} /></>}
+                </Table.SortButton>
+              </Table.HeadCell>
+            </Table.Row>
+          </Table.Head>
+
+          <Table.Body>
+            {sorted.length === 0
+              ? <Table.Empty colSpan={5}>No devices to show</Table.Empty>
+              : sorted.map((device) => (
+                <Table.Row key={device.id}>
+                  <Table.Cell column='name'>{device.name}</Table.Cell>
+                  <Table.Cell column='location'>{device.location}</Table.Cell>
+                  <Table.Cell column='status'>
+                    {device.online ? 'Online' : 'Offline'}
+                  </Table.Cell>
+                  <Table.Cell>
+                    <PlatformIcon device={device.device} />
+                  </Table.Cell>
+                  <Table.Cell column='last_active' className='numeric-column'>
+                    {new Date(device.last_active).toLocaleTimeString()}
+                  </Table.Cell>
+                </Table.Row>
+              ))}
+          </Table.Body>
+        </Table>
+      </div>
+      <div className='button-row'>
+        <button type='button' onClick={() => setRows(rows.length > 0 ? [] : deviceSamples)}>
+          {rows.length > 0 ? 'Show empty state' : 'Restore rows'}
+        </button>
+      </div>
+    </Section>
   )
 }
 
@@ -722,6 +812,8 @@ export default function KitchenSink () {
           <button type='button' onClick={() => { setComposedRatingLog(''); setComposedRatingKey(k => k + 1) }}>Reset</button>
         </div>
       </Section>
+
+      <TableSection />
 
       <SessionEmbedSection />
 
